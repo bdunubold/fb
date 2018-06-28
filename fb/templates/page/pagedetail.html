@@ -1,0 +1,341 @@
+{% extends 'master.html' %}
+
+
+{% block pageheader %}
+
+
+
+<style type="text/css">
+.parentScroll
+{
+    height: 100%;
+    width: 100%;
+    overflow-y: scroll;
+}
+.innerScroll
+{
+    height: 500px;
+    /* width: 50%; */
+}
+</style>
+
+ <div class="row">
+
+   <!-- Modal -->
+   <div class="modal fade" id="myModal" role="dialog">
+     <div class="modal-dialog">
+
+       <!-- Modal content-->
+       <div class="modal-content">
+         <div class="modal-header">
+           <button type="button" id="closemodal" class="close" data-dismiss="modal">&times;</button>
+           <h4 class="modal-title">Add Post</h4>
+         </div>
+         <div class="modal-body">
+
+
+			 <form id="myform" class="" action="">{% csrf_token %}
+
+			 	<div class="form-group">
+			 		<label for="pMessage">Message</label>
+			 		<input required type="text" class="form-control" id="pMessage" placeholder="Write something here...">
+					<input readonly required type="hidden" class="form-control" id="access_token">
+			 	</div>
+
+
+                <div class="form-group">
+                  <label for="is_published">Publishing choice</label>
+                  <select class="form-control" id="is_published">
+                    <option value="on">Publish</option>
+                    <option value="off">Dont Publish</option>
+                  </select>
+
+                </div>
+
+
+			 	  <div class="modal-footer">
+			 		  <button id="formBtn" class="btn btn-primary" type="submit" name="button">Add Post</button>
+			 		  <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+			 	  </div>
+			 </form>
+
+         </div>
+
+       </div>
+     </div>
+   </div>
+ </div>
+
+
+
+	<h1>
+	  {{page_data.name}}
+	  <small>{{page_data.category}}</small>
+	  <div class="pull-right">
+		  <button type="button" class="btn btn-default" data-toggle="modal" data-target="#myModal">
+			Add Post
+		  </button>
+	  </div>
+	</h1>
+
+{% endblock %}
+
+{% block content %}
+
+
+<div onscroll="scrolled(this)" class="row parentScroll">
+	<ul class="timeline innerScroll" id="timeline_items">
+	</ul>
+</div>
+
+{% endblock %}
+
+
+
+{% block js %}
+
+<script type="text/javascript">
+
+$(function() {
+	getPostList();
+});
+
+paging = '';
+
+
+
+function getPostList()
+{
+	$.ajax({
+		type: "GET",
+		dataType : 'json',
+		url: '/api/page/post_list/{{page_data.id}}/',
+		success: function (data){
+
+            paging = data.posts.paging;
+
+            var insight_data = data.retinsight_data;
+
+			$('#access_token').val(data.access_token);
+
+			$("#timeline_items").html("");
+			$.each(data.posts.data, function (index, value) {
+
+				var parsedItem = itemParser(value);
+
+                var html = htmlBuilder(parsedItem, value, insight_data);
+
+				$("#timeline_items").append(html);
+			});
+		},
+		failure: function() {alert("Error!");}
+	});
+}
+
+function itemParser(item)
+{
+
+	dict = {};
+
+	html = '';
+	var message = '';
+	var reaction = '';
+	var media = '';
+	var embedPost = null;
+
+	var products = 0;
+
+	if(item.message)
+		message = item.message;
+
+	if(item.attachments){
+		var data = item.attachments.data;
+
+		for (var i = 0 ;i<data.length; i++){
+
+			if(data[i].subattachments){
+				var subs = data[i].subattachments.data;
+				for(var i = 0;i<subs.length;i++)
+				{
+
+					var item = subs[i];
+					if(item.type == "commerce_product_mini")
+					{
+						var description = '';
+						var title = '';
+						if (item.description)
+							description = item.description;
+						if (item.title)
+							title = item.title
+							products++;
+					}
+					if(item.type == 'photo'){
+						media += '<img height="150" width="150" src="'+item.media.image.src+'" alt="..." class="margin">';
+					}
+				}
+			}
+			if(data[i] && data[i].type=='video_inline'){
+				media += '<div class="fb-video" data-href="'+data[i].url+'" data-width="500" data-show-text="false">';
+				media += '	<div class="fb-xfbml-parse-ignore">';
+				media += '		<blockquote cite="'+data[i].url+'">';
+				media += '			<a href="'+data[i].url+'">How to Share With Just Friends</a>';
+				media += '		</blockquote>';
+				media += '	</div>';
+				media += '</div>';
+			}
+
+			if(data[i] && data[i].type=="profile_media")
+				message = 'Profile photo has been updated.';
+			if(data[i] && data[i].type=="cover_photo")
+				message = 'Cover photo has been updated.';
+
+			if(data[i] && (data[i].type=='photo' || data[i].type=="profile_media" || data[i].type=="cover_photo") ){
+				media += '<img src="'+data[i].media.image.src+'" alt="..." class="margin">';
+			}
+
+			if(data[i] && data[i].type=='map'){
+			var ids = item.id.split('_');
+			embedPost = '<div class="fb-post" data-href="https://www.facebook.com/'+ids[0]+'/posts/'+ids[1]+'/" data-width="500" data-show-text="true">';
+			embedPost += '	<blockquote cite="https://www.facebook.com/'+ids[0]+'/posts/'+ids[1]+'/" class="fb-xfbml-parse-ignore">';
+			embedPost += '	</blockquote>';
+			embedPost += '</div>';
+			}
+
+			if(data[i] && data[i].type=='og_composer_simple'){
+				var ids = item.id.split('_');
+				embedPost = '<div class="fb-post" data-href="https://www.facebook.com/'+ids[0]+'/posts/'+ids[1]+'/" data-width="500" data-show-text="true">';
+				embedPost += '	<blockquote cite="https://www.facebook.com/'+ids[0]+'/posts/'+ids[1]+'/" class="fb-xfbml-parse-ignore">';
+				embedPost += '	</blockquote>';
+				embedPost += '</div>';
+
+			};
+
+
+
+		}
+	}
+	dict["products"] = products == 0 ? '' :  'Has ' + products + ' products. Please view on Facebook to see.';
+	dict["media"] = media;
+	dict["embedPost"] = embedPost;
+	dict["message"] = message;
+    dict["id"] = item.id;
+	return dict;
+}
+
+
+function htmlBuilder(parsedItem, value, insight_data)
+{
+
+    var view_count = insight_data[parsedItem.id] == undefined ?0 :  insight_data[parsedItem.id];
+
+    var html = '';
+    html += '<li>';
+    html += '	<div class="timeline-item">';
+    html += '		<div class="timeline-body">';
+
+
+    html += '			<div class="box box-widget">';
+    html += '				<div class="box-header with-border">';
+    html += '					<div class="user-block">';
+    html += '						<img class="img-circle" src="{{page_data.picture.data.url}}" alt="User Image">';
+    html += '						<span class="username"><a href="#">{{page_data.name}}</a></span>';
+    html += '						<span class="description">'+value.created_time+'</span>';
+    html += '					</div>';
+    html += '				</div>';
+    html += '				<div class="box-body">';
+    if(parsedItem.embedPost){
+        html += parsedItem.embedPost;
+    }else{
+        html += '					<p>'+parsedItem.message+'</p>';
+        html += '					'+parsedItem.media+'';
+        html += '					<br><p>'+parsedItem.products+'</p>';
+    }
+    html += '					<p class="text-muted">Views: '+view_count+'</p>';
+    html += '				</div>';
+    html += '			</div>';
+    html += '		</div>';
+    html += '		<div class="timeline-footer">';
+    html += '			<a target="_blank" href="'+value.permalink_url+'" class="btn btn-primary btn-xs">View on Facebook</a>';
+    html += '		</div>';
+    html += '	</div>';
+    html += '</li>';
+    return html;
+}
+
+
+
+ jQuery(document).ready(function($) {
+         var form = $('#myform');
+         form.submit(function(e){
+             e.preventDefault();
+             var pMessage = $("#pMessage").val();
+			 var access_token = $("#access_token").val();
+             var is_published = $("#is_published").val();
+
+
+             console.log('****is_published: ', is_published);
+
+
+             var token = $("input[name~='csrfmiddlewaretoken']").first().val();
+             $.ajax({
+                 type: 'POST',
+                 url: '/api/page/add_post/',
+                 data: {
+                     'pMessage': pMessage,
+                     'csrfmiddlewaretoken': token,
+					 'page_id': '{{page_data.id}}',
+					 'access_token': access_token,
+                     'is_published': is_published,
+                 },
+                 dataType: "json",
+                 success: function(resultData) {
+					 console.log(resultData);
+                 }
+             });
+         });
+
+
+		 $('#formBtn').click(function() {
+		     $('#myModal').modal('hide');
+             // location.reload();
+		 });
+ });
+
+
+function scrolled(o)
+{
+    if(o.offsetHeight + o.scrollTop == o.scrollHeight)
+    {
+        $.ajax({
+            type: 'GET',
+            url: '/api/page/next/',
+            data: {
+
+                'page_id': {{page_data.id}},
+                'raw_url': paging.next
+            },
+            dataType: "json",
+            success: function(dict_data) {
+
+                var data = dict_data.data;
+                paging = data.paging;
+
+                var insight_data = dict_data.retinsight_data;
+
+                $('#access_token').val(data.access_token);
+
+                $.each(data.data, function (index, value) {
+
+                    var parsedItem = itemParser(value);
+
+                    var html = htmlBuilder(parsedItem, value, insight_data);
+                    $("#timeline_items").append(html);
+                });
+            }
+        });
+    }
+}
+
+</script>
+
+{% endblock %}

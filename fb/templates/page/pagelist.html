@@ -1,0 +1,25 @@
+{% extends 'master.html' %}
+
+
+{% block content %}
+
+<div class="row">
+
+	{% for each in page_list %}
+
+		<div class="col-lg-3 col-xs-6">
+		  <!-- small box -->
+		  <div class="small-box bg-aqua">
+			<div class="inner">
+			  <h1>{{each.name}}</h1>
+
+			  <p>{{each.category}}</p>
+			</div>
+			<a href="{% url 'page_detail' each.id %}" class="small-box-footer">More info <i class="fa fa-arrow-circle-right"></i></a>
+		  </div>
+		</div>
+	{% endfor %}
+
+</div>
+
+{% endblock %}
